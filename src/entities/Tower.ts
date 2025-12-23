@@ -9,21 +9,33 @@ export class Tower extends Entity {
     public neighbors: Tower[] = []; // Lane system
     public isMaster: boolean = false;
 
-    // Animation
+    // Animation - Gameplay (Capture)
     public scale: number = 1;
     public captureState: 'NONE' | 'COLLAPSING' | 'REBUILDING' = 'NONE';
     public pendingOwner: number | null = null;
 
+    // Animation - Interaction (Hover/Select)
+    public interactionScale: number = 1.0;
+    public targetInteractionScale: number = 1.0;
+
+    public ownerId: number;
+
     constructor(
         x: number,
         y: number,
-        public ownerId: number, // 0: Neutral, 1: Player, 2: Enemy
+        ownerId: number, // 0: Neutral, 1: Player, 2: Enemy
     ) {
         super(x, y, 40); // Radius 40
+        this.ownerId = ownerId;
     }
 
     update(dt: number) {
-        // Animation Logic
+        // --- 1. Interaction Animation (Smooth Lerp) ---
+        // Lerp factor (speed)
+        const lerpSpeed = 10;
+        this.interactionScale += (this.targetInteractionScale - this.interactionScale) * lerpSpeed * dt;
+
+        // --- 2. Gameplay Capture Animation ---
         if (this.captureState === 'COLLAPSING') {
             this.scale -= dt * 2; // Collapse speed
             if (this.scale <= 0) {
@@ -37,8 +49,6 @@ export class Tower extends Entity {
             if (this.scale >= 1) {
                 this.scale = 1;
                 this.captureState = 'NONE';
-                // Trigger Game Over checks usually handled by Manager, 
-                // but Manager checks state so we are good.
             }
             return; // Don't regen while animating
         }
@@ -71,10 +81,13 @@ export class Tower extends Entity {
         if (this.ownerId === 1) color = '#4facfe'; // Player (Blue)
         if (this.ownerId === 2) color = '#ff0844'; // Enemy (Red)
 
+        // Combine Scales
+        const finalScale = this.scale * this.interactionScale;
+
         // Save context for scaling
         renderer.ctx.save();
         renderer.ctx.translate(this.x, this.y);
-        renderer.ctx.scale(this.scale, this.scale);
+        renderer.ctx.scale(finalScale, finalScale);
         renderer.ctx.translate(-this.x, -this.y);
 
         if (this.isMaster) {
@@ -92,7 +105,7 @@ export class Tower extends Entity {
         }
 
         // Draw Text (only if scale is reasonable to avoid glitchy text)
-        if (this.scale > 0.5) {
+        if (finalScale > 0.5) {
             renderer.drawText(this.x, this.y, Math.floor(this.unitCount).toString(), '#fff', this.isMaster ? 24 : 20);
         }
 

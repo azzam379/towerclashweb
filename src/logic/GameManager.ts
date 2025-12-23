@@ -213,16 +213,52 @@ export class GameManager {
             this.selectedTowers = [tower];
             this.isDragging = true;
             this.dragLine = { x, y };
+            // Pulse selection
+            tower.targetInteractionScale = 1.2;
         }
     }
 
     private handleInputMove(x: number, y: number) {
         if (this.isPaused) return;
+
+        // --- 1. Hover/Drag Feedback Loop ---
+        // Reset scales for non-selected
+        this.towers.forEach(t => {
+            let targetScale = 1.0;
+            // Keep selected ones bumped
+            if (this.selectedTowers.includes(t)) targetScale = 1.2;
+            t.targetInteractionScale = targetScale;
+        });
+
+        const tower = this.getTowerAt(x, y);
+
         if (this.isDragging) {
             this.dragLine = { x, y };
-            const tower = this.getTowerAt(x, y);
-            if (tower && tower.ownerId === 1 && !this.selectedTowers.includes(tower)) {
-                this.selectedTowers.push(tower);
+            // Dragging Logic
+            if (tower) {
+                // If we are over a tower while dragging
+                // 1. If it's your own (reinforce) -> Highlight
+                // 2. If it's enemy (attack) -> Highlight (maybe Red tint? Scale is fine for now)
+
+                // Add to selection if dragging over multiple owned towers
+                if (tower.ownerId === 1 && !this.selectedTowers.includes(tower)) {
+                    this.selectedTowers.push(tower);
+                    tower.targetInteractionScale = 1.2;
+                }
+
+                // Highlight target (snap effect visual)
+                // Note: If we are dragging FROM it, it's already 1.2
+                // If it's a target, make it 1.2 too.
+                tower.targetInteractionScale = 1.2;
+            }
+        } else {
+            // Just hovering (not dragging)
+            if (tower && tower.ownerId === 1) {
+                // Hover effect for player towers
+                tower.targetInteractionScale = 1.1;
+                document.body.style.cursor = 'pointer';
+            } else {
+                document.body.style.cursor = 'default';
             }
         }
     }
@@ -239,11 +275,18 @@ export class GameManager {
                         this.sendTroops(source, target);
                     }
                 });
+                // Snap Animation?
+                target.targetInteractionScale = 1.4; // Big pulse on release
+                setTimeout(() => target.targetInteractionScale = 1.0, 100);
             }
         }
         this.isDragging = false;
+
+        // Reset scales
+        this.selectedTowers.forEach(t => t.targetInteractionScale = 1.0);
         this.selectedTowers = [];
         this.dragLine = null;
+        document.body.style.cursor = 'default';
     }
 
     private update(dt: number) {
@@ -281,8 +324,6 @@ export class GameManager {
         // Logic for Delayed Game Over
         // We do this by checking if any Master tower has changed hands fully (is stable and wrong owner)
         // But we need to make sure we don't trigger while it's animating.
-        const playerMaster = this.towers.find(t => t.isMaster && t.ownerId === 1 && t.captureState === 'NONE');
-        const enemyMaster = this.towers.find(t => t.isMaster && t.ownerId === 2 && t.captureState === 'NONE');
 
         // Note: The original map has specific indices for master towers? 
         // Better to check by ID or just logic.
