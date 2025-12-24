@@ -4,11 +4,16 @@ import { Tower } from '../entities/Tower';
 import { Troop } from '../entities/Troop';
 import { Bot } from './Bot';
 import { LevelManager } from './LevelManager';
-import type { LevelConfig } from './LevelManager';
+
+import { AssetManager } from '../core/AssetManager';
 
 export class GameManager {
     private renderer: CanvasLayer;
     private loop: GameLoop;
+    public assets: AssetManager; // Public so Towers can access it via GameManager reference (if they had one)
+    // Actually Towers are drawn by GameManager passing renderer. 
+    // We should pass assets to Tower.draw() or similar.
+
     private towers: Tower[] = [];
     private troops: Troop[] = [];
     private bot: Bot;
@@ -64,6 +69,8 @@ export class GameManager {
         container.appendChild(this.uiOverlay);
 
         this.renderer = new CanvasLayer(container);
+        this.assets = new AssetManager();
+
         this.loop = new GameLoop(
             (dt) => this.update(dt),
             () => this.draw()
@@ -71,7 +78,12 @@ export class GameManager {
 
         this.bot = new Bot(this, 2);
         this.setupInput();
-        this.loadLevel(this.currentRound);
+
+        // Async Load
+        this.assets.loadAll().then(() => {
+            this.loadLevel(this.currentRound);
+            this.loop.start();
+        });
     }
 
     private togglePause() {
@@ -81,7 +93,7 @@ export class GameManager {
     }
 
     start() {
-        this.loop.start();
+        // Handled in constructor
     }
 
     private loadLevel(round: number) {
@@ -469,16 +481,56 @@ export class GameManager {
     private draw() {
         this.renderer.clear();
 
-        // Draw Lanes
+        // Draw Lanes (Curved)
         this.renderer.ctx.lineWidth = 10;
         this.renderer.ctx.lineCap = 'round';
+
         const drawnConnections = new Set<string>();
+
         this.towers.forEach(t => {
             t.neighbors.forEach(n => {
                 const key = [t.id, n.id].sort().join('-');
+
                 if (!drawnConnections.has(key)) {
                     drawnConnections.add(key);
-                    this.renderer.drawLine(t.x, t.y, n.x, n.y, '#333', 8);
+
+                    // Fixed Curve Logic (deterministic based on IDs)
+                    const dx = n.x - t.x;
+                    const dy = n.y - t.y;
+                    const cx = (t.x + n.x) / 2;
+                    const cy = (t.y + n.y) / 2;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    // Generate a "seed" from IDs (String Hash)
+                    let hash = 0;
+                    const str = key; // key is sorted ID combination
+                    for (let i = 0; i < str.length; i++) {
+                        hash = (hash << 5) - hash + str.charCodeAt(i);
+                        hash |= 0; // Convert to 32bit integer
+                    }
+
+                    // Use hash to determine direction
+                    const dir = (Math.abs(hash) % 2 === 0) ? 1 : -1;
+
+                    const offset = 40 * dir;
+                    const px = -dy / dist;
+                    const py = dx / dist;
+                    const cpX = cx + px * offset;
+                    const cpY = cy + py * offset;
+
+                    this.renderer.ctx.beginPath();
+                    this.renderer.ctx.moveTo(t.x, t.y);
+                    this.renderer.ctx.quadraticCurveTo(cpX, cpY, n.x, n.y);
+                    this.renderer.ctx.strokeStyle = '#333';
+                    this.renderer.ctx.lineWidth = 8;
+                    this.renderer.ctx.stroke();
+
+                    // Road Markings (Dashed)
+                    this.renderer.ctx.strokeStyle = '#555';
+                    this.renderer.ctx.lineWidth = 2;
+                    this.renderer.ctx.setLineDash([10, 15]);
+                    this.renderer.ctx.stroke();
+                    this.renderer.ctx.setLineDash([]);
                 }
             });
         });
@@ -504,7 +556,7 @@ export class GameManager {
         });
 
         // Entities
-        this.towers.forEach(t => t.draw(this.renderer));
+        this.towers.forEach(t => t.draw(this.renderer, this.assets));
         this.troops.forEach(t => t.draw(this.renderer));
 
         // Draw HUD

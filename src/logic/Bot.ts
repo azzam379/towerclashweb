@@ -5,10 +5,16 @@ export class Bot {
     private timer: number = 0;
     private actionInterval: number = 2.0; // Acts every 2 seconds
 
+    private game: GameManager;
+    private myId: number;
+
     constructor(
-        private game: GameManager,
-        private myId: number
-    ) { }
+        game: GameManager,
+        myId: number
+    ) {
+        this.game = game;
+        this.myId = myId;
+    }
 
     update(dt: number) {
         this.timer += dt;

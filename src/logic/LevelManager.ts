@@ -16,118 +16,119 @@ export class LevelManager {
     static getLevel(round: number): LevelConfig {
         const cx = window.innerWidth / 2;
         const cy = window.innerHeight / 2;
+        const h = window.innerHeight;
+
+        let towers: TowerConfig[] = [];
+        let connections: [number, number][] = [];
+
+        // Helper to add symmetrical connections
+        const connect = (i: number, j: number) => connections.push([i, j]);
+
+        if (round === 1) {
+            // LEVEL 1: The Duel (1v1 Line)
+            towers = [
+                { x: cx, y: h - 150, owner: 1, units: 30, isMaster: true }, // Player
+                { x: cx, y: 150, owner: 2, units: 30, isMaster: true },     // Enemy
+                { x: cx, y: h / 2, owner: 0, units: 10, isMaster: false }   // Middle
+            ];
+            connections = [[0, 2], [2, 1]];
+        } else if (round === 2) {
+            // LEVEL 2: The Triangle
+            towers = [
+                { x: cx, y: h - 150, owner: 1, units: 40, isMaster: true }, // Player
+                { x: cx, y: 150, owner: 2, units: 40, isMaster: true },     // Enemy
+                { x: cx - 200, y: h / 2, owner: 0, units: 15, isMaster: false },
+                { x: cx + 200, y: h / 2, owner: 0, units: 15, isMaster: false }
+            ];
+            // Diamond shape
+            connections = [[0, 2], [0, 3], [2, 1], [3, 1], [2, 3]];
+        } else if (round === 3) {
+            // LEVEL 3: The Cross
+            towers = [
+                { x: cx, y: h - 100, owner: 1, units: 50, isMaster: true },
+                { x: cx, y: 100, owner: 2, units: 50, isMaster: true },
+                { x: cx, y: cy, owner: 0, units: 20, isMaster: false },
+                { x: cx - 250, y: cy, owner: 0, units: 30, isMaster: false }, // Valuable flank
+                { x: cx + 250, y: cy, owner: 0, units: 30, isMaster: false }
+            ];
+            connections = [[0, 2], [2, 1], [2, 3], [2, 4], [0, 3], [0, 4], [1, 3], [1, 4]];
+        } else if (round === 4) {
+            // LEVEL 4: The Zig Zag
+            towers = [
+                { x: cx, y: h - 100, owner: 1, units: 60, isMaster: true },
+                { x: cx, y: 100, owner: 2, units: 60, isMaster: true },
+                { x: cx - 150, y: h - 250, owner: 0, units: 20, isMaster: false },
+                { x: cx + 150, y: cy, owner: 0, units: 20, isMaster: false },
+                { x: cx - 150, y: 250, owner: 0, units: 20, isMaster: false }
+            ];
+            connections = [[0, 2], [2, 3], [3, 4], [4, 1], [0, 3], [1, 3]];
+        } else if (round === 5) {
+            // LEVEL 5: The Circle of Death
+            towers.push({ x: cx, y: h - 150, owner: 1, units: 60, isMaster: true });
+            towers.push({ x: cx, y: 150, owner: 2, units: 60, isMaster: true });
+
+            const radius = 250;
+            for (let i = 0; i < 6; i++) {
+                const ang = (Math.PI * 2 / 6) * i;
+                towers.push({
+                    x: cx + Math.cos(ang) * radius,
+                    y: cy + Math.sin(ang) * radius,
+                    owner: 0,
+                    units: 25,
+                    isMaster: false
+                });
+            }
+            // Connect Ring
+            connect(2, 3); connect(3, 4); connect(4, 5); connect(5, 6); connect(6, 7); connect(7, 2);
+            // Connect Masters
+            connect(0, 3); connect(0, 4); // Player to bottom ring
+            connect(1, 6); connect(1, 7); // Enemy to top ring (approx)
+            connect(2, 5); // Cross cut
+        }
+        else {
+            // 6-20: Deterministic Procedural
+            // We pass 'round' to ensure it's the same every time 
+            return this.generateProcedural(round);
+        }
+
+        return { round, towers, connections };
+    }
+
+    private static generateProcedural(round: number): LevelConfig {
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
         const towers: TowerConfig[] = [];
         const connections: [number, number][] = [];
 
-        // Base Difficulty Settings
-        // Round 1 -> 20: Increases tower count, enemy strength
-        // const towerCount = Math.min(15, 6 + Math.floor(round / 2));
-        const enemyUnits = 30 + (round * 5);
-
-        // --- 1. Master Towers (Always present) ---
-        // Player (Bottom)
+        // --- 1. Master Towers ---
         towers.push({ x: cx, y: window.innerHeight - 100, owner: 1, units: 50, isMaster: true });
-        // Enemy (Top)
-        towers.push({ x: cx, y: 100, owner: 2, units: enemyUnits, isMaster: true });
+        towers.push({ x: cx, y: 100, owner: 2, units: 30 + round * 5, isMaster: true });
 
-        // --- 2. Neutral Towers Layout ---
-        const layoutType = round % 3; // 0: Ring, 1: Grid, 2: Random/Scattered
-
-        if (layoutType === 0) {
-            // RING LAYOUT
-            const rings = 1 + Math.floor(round / 5);
-            for (let r = 0; r < rings; r++) {
-                const radius = 150 + (r * 120);
-                const count = 4 + r * 2;
-                for (let i = 0; i < count; i++) {
-                    const angle = (Math.PI * 2 / count) * i + (r % 2 === 0 ? Math.PI / 4 : 0);
-                    towers.push({
-                        x: cx + Math.cos(angle) * radius,
-                        y: cy + Math.sin(angle) * radius,
-                        owner: 0,
-                        units: 10 + round * 2,
-                        isMaster: false
-                    });
-                }
-            }
-        } else if (layoutType === 1) {
-            // FLANK/GRID LAYOUT
-            const rows = 2 + Math.floor(round / 6);
-            const cols = 3;
-            const stepY = (window.innerHeight - 300) / rows;
-            const stepX = 200;
-
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    // Skip center column sometimes for "lanes" feel, but keep for now
-                    const x = cx + (c - 1) * stepX;
-                    const y = 200 + r * stepY;
-                    towers.push({
-                        x: x,
-                        y: y,
-                        owner: 0,
-                        units: 10 + round * 2,
-                        isMaster: false
-                    });
-                }
-            }
-        } else {
-            // RANDOMISH SCATTER (with symmetry)
-            const count = 5 + round;
+        // --- 2. Neutral Towers ---
+        const rings = 1 + Math.floor(round / 4);
+        for (let r = 0; r < rings; r++) {
+            const radius = 200 + (r * 150);
+            const count = 4 + r * 2;
             for (let i = 0; i < count; i++) {
-                const xOff = (Math.random() - 0.5) * (window.innerWidth - 200);
-                const yOff = (Math.random() - 0.5) * (window.innerHeight - 400);
+                const angle = (Math.PI * 2 / count) * i;
                 towers.push({
-                    x: cx + xOff,
-                    y: cy + yOff,
+                    x: cx + Math.cos(angle) * radius,
+                    y: cy + Math.sin(angle) * radius,
                     owner: 0,
-                    units: 10,
+                    units: 10 + round * 2,
                     isMaster: false
                 });
             }
         }
 
-        // --- 3. Connections (Proximity Base) ---
-        // Connect towers if close enough to form a graph
-        // This is a naive way, but works for procedural generation
+        // --- 3. Connections ---
         for (let i = 0; i < towers.length; i++) {
             for (let j = i + 1; j < towers.length; j++) {
-                const t1 = towers[i];
-                const t2 = towers[j];
-                const dx = t1.x - t2.x;
-                const dy = t1.y - t2.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                // Max connection distance
-                if (dist < 320) {
-                    connections.push([i, j]);
-                }
+                const dx = towers[i].x - towers[j].x;
+                const dy = towers[i].y - towers[j].y;
+                if (Math.sqrt(dx * dx + dy * dy) < 350) connections.push([i, j]);
             }
         }
-
-        // Ensure Master Towers are connected to SOMETHING
-        // Player (0) and Enemy (1) must have neighbors.
-        // If not, find closest and force connect
-        [0, 1].forEach(masterIdx => {
-            const hasConnection = connections.some(c => c[0] === masterIdx || c[1] === masterIdx);
-            if (!hasConnection && towers.length > 2) {
-                // Find closest
-                let closestIdx = -1;
-                let minD = Infinity;
-                for (let i = 2; i < towers.length; i++) {
-                    const dx = towers[masterIdx].x - towers[i].x;
-                    const dy = towers[masterIdx].y - towers[i].y;
-                    const d = Math.sqrt(dx * dx + dy * dy);
-                    if (d < minD) {
-                        minD = d;
-                        closestIdx = i;
-                    }
-                }
-                if (closestIdx !== -1) {
-                    connections.push([masterIdx, closestIdx]);
-                }
-            }
-        });
 
         return { round, towers, connections };
     }

@@ -1,5 +1,6 @@
 import { Entity } from './Entity';
 import { CanvasLayer } from '../renderer/CanvasLayer';
+import { AssetManager } from '../core/AssetManager';
 
 export class Tower extends Entity {
     public unitCount: number = 10;
@@ -76,40 +77,106 @@ export class Tower extends Entity {
         }
     }
 
-    draw(renderer: CanvasLayer) {
+
+    draw(renderer: CanvasLayer, assets?: AssetManager) {
         let color = '#ccc'; // Neutral
-        if (this.ownerId === 1) color = '#4facfe'; // Player (Blue)
-        if (this.ownerId === 2) color = '#ff0844'; // Enemy (Red)
+        let spriteName = 'tower_grey';
+
+        if (this.ownerId === 1) {
+            color = '#4facfe'; // Player (Blue)
+            spriteName = this.isMaster ? 'master_tower_blue' : 'tower_blue';
+        }
+        if (this.ownerId === 2) {
+            color = '#ff0844'; // Enemy (Red)
+            spriteName = this.isMaster ? 'master_tower_red' : 'tower_red';
+        }
 
         // Combine Scales
         const finalScale = this.scale * this.interactionScale;
+        const ctx = renderer.ctx;
 
         // Save context for scaling
-        renderer.ctx.save();
-        renderer.ctx.translate(this.x, this.y);
-        renderer.ctx.scale(finalScale, finalScale);
-        renderer.ctx.translate(-this.x, -this.y);
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.scale(finalScale, finalScale);
 
-        if (this.isMaster) {
-            // Draw Square for Master
-            const size = this.radius * 2.2;
-            renderer.ctx.fillStyle = color;
-            renderer.ctx.fillRect(this.x - size / 2, this.y - size / 2, size, size);
+        const img = assets?.getImage(spriteName);
 
-            renderer.ctx.lineWidth = 4;
-            renderer.ctx.strokeStyle = '#FFD700'; // Gold border
-            renderer.ctx.strokeRect(this.x - size / 2, this.y - size / 2, size, size);
+        if (img) {
+            // Draw Sprite
+            const size = this.radius * 2.5; // Slightly larger than radius
+            ctx.drawImage(img, -size / 2, -size / 2, size, size);
+
+            // Interaction Highlight (Selection Ring instead of modifying color)
+            // Just basic glow if interactionScale > 1 is enough usually, 
+            // but we might want a selection circle behind.
+            // Since we scaled context, we can just draw circle behind if we want.
         } else {
-            renderer.drawCircle(this.x, this.y, this.radius, color);
-            renderer.drawStrokeCircle(this.x, this.y, this.radius, '#fff', 3);
+            // FALLBACK TO SHAPES
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#fff';
+
+            if (this.isMaster) {
+                // --- MASTER CASTLE VISUAL ---
+                const w = this.radius * 1.8;
+                const h = this.radius * 1.6;
+
+                // Base
+                ctx.fillRect(-w / 2, -h / 2, w, h);
+                ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+                // Battlements (Top)
+                const cw = w / 3;
+                ctx.fillRect(-w / 2, -h / 2 - 10, cw, 10); // Left Turret
+                ctx.strokeRect(-w / 2, -h / 2 - 10, cw, 10);
+
+                ctx.fillRect(w / 2 - cw, -h / 2 - 10, cw, 10); // Right Turret
+                ctx.strokeRect(w / 2 - cw, -h / 2 - 10, cw, 10);
+
+                ctx.fillRect(-cw / 2, -h / 2 - 5, cw, 5); // Center small
+
+                // Door
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(0, h / 2, w / 4, Math.PI, 0);
+                ctx.fill();
+
+                // Gold Border
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#FFD700';
+                ctx.strokeRect(-w / 2 - 5, -h / 2 - 5, w + 10, h + 10);
+
+            } else {
+                // --- NORMAL TURRET VISUAL ---
+                // Base Circle
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+
+                // Inner Core (Darker)
+                ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius * 0.6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Top Canon/Spire
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.rect(-5, -this.radius * 1.2, 10, this.radius * 1.2);
+                ctx.fill();
+                ctx.stroke();
+            }
         }
 
+        // Unit Count
         // Draw Text (only if scale is reasonable to avoid glitchy text)
         if (finalScale > 0.5) {
-            renderer.drawText(this.x, this.y, Math.floor(this.unitCount).toString(), '#fff', this.isMaster ? 24 : 20);
+            renderer.drawText(0, this.isMaster ? 40 : 5, Math.floor(this.unitCount).toString(), '#fff', this.isMaster ? 24 : 20);
         }
 
-        renderer.ctx.restore();
+        ctx.restore();
     }
 
     addUnits(amount: number) {
