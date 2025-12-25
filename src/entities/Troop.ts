@@ -1,6 +1,7 @@
 import { Entity } from './Entity';
 import { Tower } from './Tower';
 import { CanvasLayer } from '../renderer/CanvasLayer';
+import { AssetManager } from '../core/AssetManager';
 
 export class Troop extends Entity {
     public speed: number = 100; // pixels per second
@@ -136,11 +137,26 @@ export class Troop extends Entity {
         this.y = (invT * invT * this.p0.y) + (2 * invT * t * this.p1.y) + (t * t * this.p2.y);
     }
 
-    draw(renderer: CanvasLayer) {
+    draw(renderer: CanvasLayer, assets?: AssetManager) {
         let color = '#fff';
-        if (this.ownerId === 1) color = '#a3d5ff'; // Light Blue
-        if (this.ownerId === 2) color = '#ff8fa3'; // Light Red
+        let spriteName = '';
 
-        renderer.drawCircle(this.x, this.y, this.radius, color);
+        if (this.ownerId === 1) {
+            color = '#a3d5ff'; // Light Blue
+            spriteName = 'blue_troops';
+        }
+        if (this.ownerId === 2) {
+            color = '#ff8fa3'; // Light Red
+            spriteName = 'red_troops';
+        }
+
+        const img = assets?.getImage(spriteName);
+
+        if (img) {
+            const size = 30; // 30x30 size (smaller than Tower's ~100)
+            renderer.ctx.drawImage(img, this.x - size / 2, this.y - size / 2, size, size);
+        } else {
+            renderer.drawCircle(this.x, this.y, this.radius, color);
+        }
     }
 }

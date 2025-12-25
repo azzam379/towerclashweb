@@ -9,7 +9,9 @@ export class AssetManager {
             'master_tower_red',
             'tower_blue',
             'tower_red',
-            'tower_grey'
+            'tower_grey',
+            'red_troops',
+            'blue_troops'
         ];
 
         const promises = assets.map(name => {

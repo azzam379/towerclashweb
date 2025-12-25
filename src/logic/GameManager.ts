@@ -557,7 +557,7 @@ export class GameManager {
 
         // Entities
         this.towers.forEach(t => t.draw(this.renderer, this.assets));
-        this.troops.forEach(t => t.draw(this.renderer));
+        this.troops.forEach(t => t.draw(this.renderer, this.assets));
 
         // Draw HUD
         this.renderer.drawText(window.innerWidth / 2, 50, `Round ${this.currentRound} / ${this.maxRounds}`, '#fff', 30);
